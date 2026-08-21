@@ -1,5 +1,5 @@
 // proxy.js - Vercel serverless proxy untuk API Setoran Kasir & Report 2324
-// Letakkan file ini sebagai: api/proxy.js
+// Letakkan file ini pada folder: api/proxy.js
 
 const TARGET_SETORAN_API = 'https://lautanapi.vercel.app/api/report/setoran-kasir';
 const TARGET_GABUNGAN_API = 'https://lautanapi.vercel.app/api/report/gabungan';
@@ -23,7 +23,7 @@ module.exports = async (req, res) => {
 
     const response = await fetch(url, {
       method: 'GET',
-      headers: { 'Accept': 'application/json, text/html' }
+      headers: { 'Accept': 'application/json, text/html, */*' }
     });
 
     const text = await response.text();
@@ -31,7 +31,7 @@ module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    res.setHeader('Content-Type', response.headers.get('content-type') || 'application/json; charset=utf-8');
+    res.setHeader('Content-Type', response.headers.get('content-type') || 'text/html; charset=utf-8');
     res.send(text);
   } catch (error) {
     res.status(500).json({
