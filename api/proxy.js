@@ -1,43 +1,43 @@
-// proxy.js - Vercel serverless proxy untuk API Setoran Kasir & Report 2324
-// Letakkan file ini pada folder: api/proxy.js
+// Vercel serverless proxy
+// Deploy this file as: /api/proxy.js
 
-const TARGET_SETORAN_API = 'https://lautanapi.vercel.app/api/report/setoran-kasir';
-const TARGET_GABUNGAN_API = 'https://lautanapi.vercel.app/api/report/gabungan';
-
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   try {
-    const params = new URLSearchParams(req.query || {});
-    const storeId = params.get('storeId') || 'M604';
-    const report = params.get('report') || 'setoran';
-    const userId = params.get('userId') || '23067884';
-    const periode1 = params.get('periode1') || new Intl.DateTimeFormat('id-ID', {
-      timeZone: 'Asia/Jakarta',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    }).format(new Date()).replaceAll('/', '-');
+    const target = new URL(req.url, `https://${req.headers.host}`);
+    const upstreamBase = process.env.UPSTREAM_API_URL || 'https://dash-opr-mobile-dot-opr-mobile-reporting-sat-prd.et.r.appspot.com/iktDashboard';
 
-    const targetApi = report === '2324' ? TARGET_GABUNGAN_API : TARGET_SETORAN_API;
-    const userParam = report === '2324' ? '' : `&userId=${encodeURIComponent(userId)}`;
-    const url = `${targetApi}?storeId=${encodeURIComponent(storeId)}${userParam}&periode1=${encodeURIComponent(periode1)}`;
+    if (!upstreamBase) {
+      return res.status(500).json({ error: "UPSTREAM_API_URL belum dikonfigurasi." });
+    }
 
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: { 'Accept': 'application/json, text/html, */*' }
+    // Forward the query string from /api/proxy?... to the upstream API.
+    const upstreamUrl = new URL(upstreamBase);
+    target.searchParams.forEach((value, key) => {
+      upstreamUrl.searchParams.set(key, value);
     });
 
-    const text = await response.text();
+    const response = await fetch(upstreamUrl.toString(), {
+      method: req.method,
+      headers: {
+        "Accept": req.headers.accept || "application/json",
+        "Content-Type": req.headers["content-type"] || "application/json"
+      },
+      body: ["GET", "HEAD"].includes(req.method) ? undefined : req.body
+    });
+
+    const contentType = response.headers.get("content-type") || "application/json";
+    const body = await response.text();
+
     res.status(response.status);
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    res.setHeader('Content-Type', response.headers.get('content-type') || 'text/html; charset=utf-8');
-    res.send(text);
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    return res.send(body);
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Proxy gagal mengambil data API',
-      error: error.message
+    return res.status(500).json({
+      error: "Proxy error",
+      message: error?.message || String(error)
     });
   }
-};
+}
